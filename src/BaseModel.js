@@ -6,6 +6,7 @@ const isFunction = p =>
 export default class BaseModel {
   constructor(obj = {}) {
     this.setProperties(obj)
+    return new Proxy(this, this)
   }
 
   setProperties(props) {
@@ -20,6 +21,12 @@ export default class BaseModel {
       }
     })
     return this
+  }
+
+  get(target, prop) {
+    // TODO: BaseModel: mapMagicMethodGet
+    // Priority: mutator (get....Atribute), relation (getResult)
+    return this[prop] || ''
   }
 
   static get database() {
@@ -93,5 +100,45 @@ export default class BaseModel {
    */
   static query(options) {
     return this.repository.query(options)
+  }
+
+  static pushAll() {
+    // TODO: BaseModel:pushAll
+    return 0
+  }
+
+  static pullAll() {
+    // TODO: BaseModel:pullAll
+    return 0
+  }
+
+  push() {
+    // TODO: BaseModel:push
+    return this
+  }
+
+  pull() {
+    // TODO: BaseModel:pull
+    return this
+  }
+
+  hasOne() {
+    // TODO: BaseModel:hasOne
+    return this
+  }
+
+  hasMany() {
+    // TODO: BaseModel:hasMany
+    return this
+  }
+
+  belongsToOne() {
+    // TODO: BaseModel:belongsToOne
+    return this
+  }
+
+  belongsToMany() {
+    // TODO: BaseModel:belongsToMany
+    return this
   }
 }

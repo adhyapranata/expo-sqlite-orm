@@ -17,6 +17,7 @@ export function find(tableName) {
  *   where: {status_eq: 'encerrado'}
  * })
  */
+
 export function query(tableName, options = {}) {
   const { columns, page, limit, where, order } = {
     ...defaultOptions,

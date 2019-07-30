@@ -16,7 +16,7 @@ export default class DatabaseLayer {
               sql,
               params[index],
               (_, { rows, insertId }) => {
-                sqlResolve({ rows: rows._array, insertId })
+                sqlResolve({ rows: rows.raw(), insertId })
               },
               sqlReject
             )

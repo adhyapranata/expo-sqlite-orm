@@ -77,7 +77,14 @@ export default class BaseModel {
     return this.constructor.repository.destroy(this.id)
   }
 
-  static destroy(id) {
+  static destroy(id, options = {softDelete: false}) {
+    if (this.columnMapping.hasOwnProperty('deleted_at') && options.softDelete) {
+      return this.find(id).then(res => {
+        res.deleted_at = Date.now()
+        return res.save()
+      })
+    }
+
     return this.repository.destroy(id)
   }
 

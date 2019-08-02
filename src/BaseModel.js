@@ -109,6 +109,18 @@ export default class BaseModel {
     return this.repository.query(options)
   }
 
+  static queryRaw ({options}) {
+      let whereStatement = options.where ? `WHERE (${options.where})` : ''
+      let sortStatement = options.order ? `ORDER BY ${options.order}` : ''
+      let limitStatement = (options.limit && options.page) ? `LIMIT ${options.limit} OFFSET ${options.limit * (options.page - 1)}` : ''
+
+      const query = `SELECT ${options.select || '*'} FROM ${this.tableName} ${whereStatement} ${sortStatement} ${limitStatement};`
+      const databaseLayer = new DatabaseLayer(this.database, this.tableName)
+      return databaseLayer.executeSql(query).then(res => {
+          return res.rows.length ? res.rows : []
+      })
+  }
+
   static pullAll ({ api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'} }) {
     if (!api) return false
     return api[this.tableName][method]({ params }).then(res => {
@@ -135,18 +147,18 @@ export default class BaseModel {
     })
   }
 
-  static get queue () {
+  static getQueue () {
     const databaseLayer = new DatabaseLayer(this.database, this.tableName)
     return databaseLayer.executeSql(`SELECT * FROM ${this.tableName} WHERE (sycned_at IS NULL OR updated_at > sycned_at OR deleted_at IS NOT NULL);`)
   }
 
   static pushAll ({ api, methods = {store: 'store', update: 'update', destroy: 'destroy'} }) {
     if (!api) return false
-    this.queue()
+    return this.getQueue()
       .then(res => {
-        if (!res.rows.length) return res
         let instance = null
         let promise = Promise.resolve(null)
+        if (!res.rows.length) return promise
 
         for (let item of res.rows) {
           instance = new this(item)
@@ -179,7 +191,13 @@ export default class BaseModel {
 
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
       const databaseLayer = new DatabaseLayer(self.database, self.tableName)
-      return databaseLayer.bulkInsertOrReplace([data])
+      return databaseLayer.bulkInsertOrReplace([data]).then(res => {
+        if (method === 'store') {
+          return self.destroy(payload.body.id)
+        }
+
+        return Promise.resolve(res)
+      })
     })
   }
 
@@ -193,6 +211,10 @@ export default class BaseModel {
 
   _isDestroyed () {
     return !!this.deleted_at
+  }
+
+  _isNotSynced () {
+    return this._isNew() || this._isUpdated() || this._isDestroyed()
   }
 
   hasOne() {

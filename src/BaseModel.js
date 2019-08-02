@@ -26,7 +26,7 @@ export default class BaseModel {
   }
 
   get(target, prop) {
-    return this[prop] || this[prop]()
+    return this[prop] || typeof this[prop] === 'function' ? this[prop] : ''
   }
 
   static get database() {

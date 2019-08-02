@@ -1,4 +1,6 @@
 import Repository from './Repository'
+import DatabaseLayer from 'expo-sqlite-orm/src/DatabaseLayer'
+import moment from 'moment'
 
 const isFunction = p =>
   Object.prototype.toString.call(p) === '[object Function]'
@@ -24,9 +26,7 @@ export default class BaseModel {
   }
 
   get(target, prop) {
-    // TODO: BaseModel: mapMagicMethodGet
-    // Priority: mutator (get....Atribute), relation (getResult)
-    return this[prop] || ''
+    return this[prop] || this[prop]()
   }
 
   static get database() {
@@ -80,7 +80,7 @@ export default class BaseModel {
   static destroy(id, options = {softDelete: false}) {
     if (this.columnMapping.hasOwnProperty('deleted_at') && options.softDelete) {
       return this.find(id).then(res => {
-        res.deleted_at = Date.now()
+        res.deleted_at = moment().format('YYYY-MM-DD HH:mm:ss')
         return res.save()
       })
     }
@@ -109,24 +109,90 @@ export default class BaseModel {
     return this.repository.query(options)
   }
 
-  static pushAll() {
-    // TODO: BaseModel:pushAll
-    return 0
+  static pullAll ({ api, method = 'getAll', params = {}, options = {page: 1, limit: 15, order: 'id'} }) {
+    if (!api) return false
+    return api[this.tableName][method]({ params }).then(res => {
+      const data = res.data.data.map(item => {
+        item['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
+        return item
+      })
+      const databaseLayer = new DatabaseLayer(this.database, this.tableName)
+      return databaseLayer.bulkInsertOrReplace(data).then(res => {
+        return this.query(options)
+      })
+    })
   }
 
-  static pullAll() {
-    // TODO: BaseModel:pullAll
-    return 0
+  static pull ({ api, method = 'get', id, params = {} }) {
+    if (!api || !id) return false
+    return api[this.tableName][method]({ id, params }).then(res => {
+      const data = res.data.data
+      data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
+      const databaseLayer = new DatabaseLayer(this.database, this.tableName)
+      return databaseLayer.bulkInsertOrReplace([data]).then(res => {
+        return this.find(res[0].insertId)
+      })
+    })
   }
 
-  push() {
-    // TODO: BaseModel:push
-    return this
+  static get queue () {
+    const databaseLayer = new DatabaseLayer(this.database, this.tableName)
+    return databaseLayer.executeSql(`SELECT * FROM ${this.tableName} WHERE (sycned_at IS NULL OR updated_at > sycned_at OR deleted_at IS NOT NULL);`)
   }
 
-  pull() {
-    // TODO: BaseModel:pull
-    return this
+  static pushAll ({ api, methods = {store: 'store', update: 'update', destroy: 'destroy'} }) {
+    if (!api) return false
+    this.queue()
+      .then(res => {
+        if (!res.rows.length) return res
+        let instance = null
+        let promise = Promise.resolve(null)
+
+        for (let item of res.rows) {
+          instance = new this(item)
+          if (instance._isNew()) {
+            promise = promise.then(() => instance.push({api, method: methods.store, payload: {body: item}}))
+          } else if (instance._isUpdated()) {
+            promise = promise.then(() => instance.push({api, method: methods.update, payload: {id: item.id, body: item}}))
+          } else if (instance._isDestroyed()) {
+            promise = promise.then(() => instance.push({api, method: methods.destroy, payload: {id: item.id}}))
+          }
+        }
+
+        return promise
+      }).catch(err => {
+        throw err
+      })
+  }
+
+  push ({ api, method, payload }) {
+    if (!api || !method || !payload) return false
+    let data = null
+    const self = Object.getPrototypeOf(this).constructor
+
+    return api[self.tableName][method](payload).then(res => {
+      data = res.data.data
+
+      if (method === 'destroy') {
+          return self.destroy(payload.id)
+      }
+
+      data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
+      const databaseLayer = new DatabaseLayer(self.database, self.tableName)
+      return databaseLayer.bulkInsertOrReplace([data])
+    })
+  }
+
+  _isNew () {
+    return !this.sycned_at
+  }
+
+  _isUpdated () {
+    return moment(this.updated_at).isAfter(this.sycned_at)
+  }
+
+  _isDestroyed () {
+    return !!this.deleted_at
   }
 
   hasOne() {

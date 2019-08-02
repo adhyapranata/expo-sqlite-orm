@@ -109,7 +109,7 @@ export default class BaseModel {
     return this.repository.query(options)
   }
 
-  static pullAll ({ api, method = 'getAll', params = {}, options = {page: 1, limit: 15, order: 'id'} }) {
+  static pullAll ({ api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'} }) {
     if (!api) return false
     return api[this.tableName][method]({ params }).then(res => {
       const data = res.data.data.map(item => {
@@ -118,7 +118,7 @@ export default class BaseModel {
       })
       const databaseLayer = new DatabaseLayer(this.database, this.tableName)
       return databaseLayer.bulkInsertOrReplace(data).then(res => {
-        return this.query(options)
+        return this.query(queryOptions)
       })
     })
   }

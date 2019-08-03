@@ -193,7 +193,20 @@ export default class BaseModel {
       const databaseLayer = new DatabaseLayer(self.database, self.tableName)
       return databaseLayer.bulkInsertOrReplace([data]).then(res => {
         if (method === 'store') {
-          return self.destroy(payload.body.id)
+          // destroy old data
+          return self.destroy(payload.body.id).then(res => {
+            // update children foreign key
+            let promise = Promise.resolve(null)
+            self.childrens.forEach(children => {
+              let databaseLayer = new DatabaseLayer(children.database, children.tableName)
+              promise = promise.then(() => {
+                return databaseLayer.executeSql(`UPDATE ${children.tableName} SET ${self.name.toLowerCase()}_id = ${data.id} WHERE ${self.name.toLowerCase()}_id = ${payload.body.id};`)
+              })
+            })
+            return promise
+          }).catch(err => {
+            throw err
+          })
         }
 
         return Promise.resolve(res)

@@ -199,7 +199,7 @@ export default class BaseModel {
         return Promise.resolve(res)
       })
     }).catch(err => {
-        if (err.response.status === 404) {
+        if (err.response && err.response.status === 404) {
             return self.destroy(payload.body ? payload.body.id : payload.id)
         }
 

@@ -41,6 +41,14 @@ export default class BaseModel {
     throw new Error('tableName não definido')
   }
 
+  static get childrens() {
+    return []
+  }
+
+  static get parent() {
+    return null
+  }
+
   static get columnMapping() {
     return {}
   }
@@ -234,6 +242,22 @@ export default class BaseModel {
 
   _isNotSynced () {
     return this._isNew() || this._isUpdated() || this._isDestroyed()
+  }
+
+  static isNew ({ item }) {
+    return !item.sycned_at
+  }
+
+  static isUpdated ({ item }) {
+    return moment(item.updated_at).isAfter(item.sycned_at)
+  }
+
+  static isDestroyed ({ item }) {
+    return !!item.deleted_at
+  }
+
+  static isNotSynced ({ item }) {
+    return this.isNew({ item }) || this.isUpdated({ item }) || this.isDestroyed({ item })
   }
 
   hasOne() {

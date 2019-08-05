@@ -136,8 +136,10 @@ export default class BaseModel {
         item['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
         return item
       })
+
+      const altered = this.alterResponse({data, method: 'pullAll'})
       const databaseLayer = new DatabaseLayer(this.database, this.tableName)
-      return databaseLayer.bulkInsertOrReplace(data).then(res => {
+      return databaseLayer.bulkInsertOrReplace(altered).then(res => {
         return this.query(queryOptions)
       })
     })
@@ -148,8 +150,9 @@ export default class BaseModel {
     return api[this.tableName][method]({ id, params }).then(res => {
       const data = res.data.data
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
+      const altered = this.alterResponse({data, method: 'pull'})
       const databaseLayer = new DatabaseLayer(this.database, this.tableName)
-      return databaseLayer.bulkInsertOrReplace([data]).then(res => {
+      return databaseLayer.bulkInsertOrReplace([altered]).then(res => {
         return this.find(res[0].insertId)
       })
     })
@@ -198,6 +201,8 @@ export default class BaseModel {
       }
 
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
+      data = self.alterResponse({data, method: 'push'})
+
       const databaseLayer = new DatabaseLayer(self.database, self.tableName)
       return databaseLayer.bulkInsertOrReplace([data]).then(res => {
         if (method === 'store') {
@@ -258,6 +263,14 @@ export default class BaseModel {
 
   static isNotSynced ({ item }) {
     return this.isNew({ item }) || this.isUpdated({ item }) || this.isDestroyed({ item })
+  }
+
+  static injectOptions ({ data }) {
+    return {}
+  }
+
+  static alterResponse ({ data, method }) {
+    return data
   }
 
   hasOne() {

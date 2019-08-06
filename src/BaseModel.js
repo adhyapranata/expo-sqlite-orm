@@ -117,27 +117,63 @@ export default class BaseModel {
     return this.repository.query(options)
   }
 
-  static queryRaw ({options}) {
-      let whereStatement = options.where ? `WHERE (${options.where})` : ''
-      let sortStatement = options.order ? `ORDER BY ${options.order}` : ''
-      let limitStatement = (options.limit && options.page) ? `LIMIT ${options.limit} OFFSET ${options.limit * (options.page - 1)}` : ''
+  static queryRaw({options = {}, tableName}) {
+    let whereStatement = options.where ? `WHERE (${options.where})` : ''
+    let sortStatement = options.order ? `ORDER BY ${options.order}` : ''
+    let limitStatement = (options.limit && options.page) ? `LIMIT ${options.limit} OFFSET ${options.limit * (options.page - 1)}` : ''
+    const table = tableName || this.tableName
 
-      const query = `SELECT ${options.select || '*'} FROM ${this.tableName} ${whereStatement} ${sortStatement} ${limitStatement};`
-      const databaseLayer = new DatabaseLayer(this.database, this.tableName)
-      return databaseLayer.executeSql(query).then(res => {
-          return res.rows.length ? res.rows : []
-      })
+    const query = `SELECT ${options.select || '*'} FROM ${table} ${whereStatement} ${sortStatement} ${limitStatement};`
+    const databaseLayer = new DatabaseLayer(this.database, this.tableName)
+    return databaseLayer.executeSql(query).then(res => {
+      return res.rows.length ? res.rows : []
+    })
   }
 
-  static pullAll ({ api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'} }) {
+  hasMany(target, foreignKey = 'id', otherKey) {
+    const self = Object.getPrototypeOf(this).constructor
+    const key = otherKey || `${self.name.toLowerCase()}_id`
+    const options = {
+      where: `${key} = ${this[foreignKey]}`
+    }
+
+    return target.queryRaw({options})
+  }
+
+  belongsToMany(target, foreignKey = `${target.name.toLowerCase()}_id`, otherKey = 'id') {
+    const options = {
+      where: `${otherKey} = ${this[foreignKey]}`
+    }
+
+    return target.queryRaw({options})
+  }
+
+  hasOne(target, foreignKey = 'id', otherKey = `${self.name.toLowerCase()}_id`) {
+    return this.hasMany(target, foreignKey, otherKey).then(res => {
+      return res[0]
+    }).catch(err => {
+      throw err
+    })
+  }
+
+  belongsTo(target, foreignKey = `${target.name.toLowerCase()}_id`, otherKey = 'id') {
+    return target.belongsToMany(target, foreignKey, otherKey).then(res => {
+      return res[0]
+    }).catch(err => {
+      throw err
+    })
+  }
+
+  static pullAll({api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'}}) {
     if (!api) return false
-    return api[this.tableName][method]({ params }).then(res => {
+    return api[this.tableName][method]({params}).then(res => {
       const data = res.data.data.map(item => {
         item['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
         return item
       })
 
       const altered = this.alterResponse({data, method: 'pullAll'})
+
       const databaseLayer = new DatabaseLayer(this.database, this.tableName)
       return databaseLayer.bulkInsertOrReplace(altered).then(res => {
         return this.query(queryOptions)
@@ -145,12 +181,13 @@ export default class BaseModel {
     })
   }
 
-  static pull ({ api, method = 'get', id, params = {} }) {
+  static pull({api, method = 'get', id, params = {}}) {
     if (!api || !id) return false
-    return api[this.tableName][method]({ id, params }).then(res => {
+    return api[this.tableName][method]({id, params}).then(res => {
       const data = res.data.data
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
       const altered = this.alterResponse({data, method: 'pull'})
+
       const databaseLayer = new DatabaseLayer(this.database, this.tableName)
       return databaseLayer.bulkInsertOrReplace([altered]).then(res => {
         return this.find(res[0].insertId)
@@ -158,12 +195,15 @@ export default class BaseModel {
     })
   }
 
-  static getQueue () {
+  static getQueue() {
     const databaseLayer = new DatabaseLayer(this.database, this.tableName)
-    return databaseLayer.executeSql(`SELECT * FROM ${this.tableName} WHERE (sycned_at IS NULL OR updated_at > sycned_at OR deleted_at IS NOT NULL);`)
+    return databaseLayer.executeSql(`SELECT *
+                                     FROM ${this.tableName}
+                                     WHERE
+                                       (sycned_at IS NULL OR updated_at > sycned_at OR deleted_at IS NOT NULL);`)
   }
 
-  static pushAll ({ api, methods = {store: 'store', update: 'update', destroy: 'destroy'} }) {
+  static pushAll({api, methods = {store: 'store', update: 'update', destroy: 'destroy'}}) {
     if (!api) return false
     return this.getQueue()
       .then(res => {
@@ -176,9 +216,17 @@ export default class BaseModel {
           if (instance._isNew()) {
             promise = promise.then(() => instance.push({api, method: methods.store, payload: {body: item}}))
           } else if (instance._isUpdated()) {
-            promise = promise.then(() => instance.push({api, method: methods.update, payload: {id: item.id, body: item}}))
+            promise = promise.then(() => instance.push({
+              api,
+              method: methods.update,
+              payload: {id: item.id, body: item}
+            }))
           } else if (instance._isDestroyed()) {
-            promise = promise.then(() => instance.push({api, method: methods.destroy, payload: {id: item.id}}))
+            promise = promise.then(() => instance.push({
+              api,
+              method: methods.destroy,
+              payload: {id: item.id}
+            }))
           }
         }
 
@@ -188,16 +236,18 @@ export default class BaseModel {
       })
   }
 
-  push ({ api, method, payload }) {
+  push({api, method, payload}) {
     if (!api || !method || !payload) return false
     let data = null
     const self = Object.getPrototypeOf(this).constructor
+
+    payload.options = self.injectOptions({data: this})
 
     return api[self.tableName][method](payload).then(res => {
       data = res.data.data
 
       if (method === 'destroy') {
-          return self.destroy(payload.id)
+        return self.destroy(payload.id)
       }
 
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
@@ -213,7 +263,9 @@ export default class BaseModel {
             self.childrens.forEach(children => {
               let databaseLayer = new DatabaseLayer(children.database, children.tableName)
               promise = promise.then(() => {
-                return databaseLayer.executeSql(`UPDATE ${children.tableName} SET ${self.name.toLowerCase()}_id = ${data.id} WHERE ${self.name.toLowerCase()}_id = ${payload.body.id};`)
+                return databaseLayer.executeSql(`UPDATE ${children.tableName}
+                SET ${self.name.toLowerCase()}_id = ${data.id}
+                WHERE ${self.name.toLowerCase()}_id = ${payload.body.id};`)
               })
             })
             return promise
@@ -225,71 +277,51 @@ export default class BaseModel {
         return Promise.resolve(res)
       })
     }).catch(err => {
-        if (err.response && err.response.status === 404) {
-            return self.destroy(payload.body ? payload.body.id : payload.id)
-        }
+      if (err.response && err.response.status === 404) {
+        return self.destroy(payload.body ? payload.body.id : payload.id)
+      }
 
-        throw err
+      throw err
     })
   }
 
-  _isNew () {
+  _isNew() {
     return !this.sycned_at
   }
 
-  _isUpdated () {
+  _isUpdated() {
     return moment(this.updated_at).isAfter(this.sycned_at)
   }
 
-  _isDestroyed () {
+  _isDestroyed() {
     return !!this.deleted_at
   }
 
-  _isNotSynced () {
+  _isNotSynced() {
     return this._isNew() || this._isUpdated() || this._isDestroyed()
   }
 
-  static isNew ({ item }) {
+  static isNew({item}) {
     return !item.sycned_at
   }
 
-  static isUpdated ({ item }) {
+  static isUpdated({item}) {
     return moment(item.updated_at).isAfter(item.sycned_at)
   }
 
-  static isDestroyed ({ item }) {
+  static isDestroyed({item}) {
     return !!item.deleted_at
   }
 
-  static isNotSynced ({ item }) {
-    return this.isNew({ item }) || this.isUpdated({ item }) || this.isDestroyed({ item })
+  static isNotSynced({item}) {
+    return this.isNew({item}) || this.isUpdated({item}) || this.isDestroyed({item})
   }
 
-  static injectOptions ({ data }) {
+  static injectOptions({data}) {
     return {}
   }
 
-  static alterResponse ({ data, method }) {
+  static alterResponse({data, method}) {
     return data
-  }
-
-  hasOne() {
-    // TODO: BaseModel:hasOne
-    return this
-  }
-
-  hasMany() {
-    // TODO: BaseModel:hasMany
-    return this
-  }
-
-  belongsToOne() {
-    // TODO: BaseModel:belongsToOne
-    return this
-  }
-
-  belongsToMany() {
-    // TODO: BaseModel:belongsToMany
-    return this
   }
 }

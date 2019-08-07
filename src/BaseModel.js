@@ -106,6 +106,27 @@ export default class BaseModel {
     return this.queryRaw()
   }
   
+  static count({ column = 'id', where }) {
+    return this.queryRaw({options: {
+      select: `COUNT(${column})`,
+      where
+    }})
+  }
+  
+  static avg({ column, where }) {
+    return this.queryRaw({options: {
+      select: `AVG(${column})`,
+      where
+    }})
+  }
+  
+  static sum({ column, where }) {
+    return this.queryRaw({options: {
+      select: `SUM(${column})`,
+      where
+    }})
+  }
+  
   static find(id) {
     return this.repository.find(id).then(res => (res ? new this(res) : res))
   }

@@ -119,7 +119,7 @@ export default class BaseModel {
     return this.repository.query(options)
   }
   
-  static queryRaw ({options = {}, tableName}) {
+  static queryRaw({options = {}, tableName}) {
     let whereStatement = options.where ? `WHERE (${options.where})` : ''
     let sortStatement = options.order ? `ORDER BY ${options.order}` : ''
     let limitStatement = (options.limit && options.page) ? `LIMIT ${options.limit} OFFSET ${options.limit * (options.page - 1)}` : ''
@@ -132,7 +132,7 @@ export default class BaseModel {
     })
   }
   
-  hasMany (target, foreignKey = 'id', otherKey) {
+  hasMany(target, foreignKey = 'id', otherKey) {
     const self = Object.getPrototypeOf(this).constructor
     const key = otherKey || `${toUnderscoreCase(self.name)}_id`
     const options = {
@@ -142,7 +142,7 @@ export default class BaseModel {
     return target.queryRaw({options})
   }
   
-  belongsToMany (target, foreignKey, otherKey = 'id') {
+  belongsToMany(target, foreignKey, otherKey = 'id') {
     const key = foreignKey || `${toUnderscoreCase(target.name)}_id`
     const options = {
       where: `${otherKey} = ${this[key]}`
@@ -151,7 +151,7 @@ export default class BaseModel {
     return target.queryRaw({options})
   }
   
-  hasOne (target, foreignKey = 'id', otherKey) {
+  hasOne(target, foreignKey = 'id', otherKey) {
     return this.hasMany(target, foreignKey, otherKey).then(res => {
       return res[0]
     }).catch(err => {
@@ -159,7 +159,7 @@ export default class BaseModel {
     })
   }
   
-  belongsTo (target, foreignKey, otherKey = 'id') {
+  belongsTo(target, foreignKey, otherKey = 'id') {
     return this.belongsToMany(target, foreignKey, otherKey).then(res => {
       return res[0]
     }).catch(err => {
@@ -167,9 +167,9 @@ export default class BaseModel {
     })
   }
   
-  static pullAll ({ api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'} }) {
+  static pullAll({api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'}}) {
     if (!api) return false
-    return api[toCamelCase(this.tableName)][method]({ params }).then(res => {
+    return api[toCamelCase(this.tableName)][method]({params}).then(res => {
       const data = res.data.data.map(item => {
         item['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
         return item
@@ -184,9 +184,9 @@ export default class BaseModel {
     })
   }
   
-  static pull ({ api, method = 'get', id, params = {} }) {
+  static pull({api, method = 'get', id, params = {}}) {
     if (!api || !id) return false
-    return api[toCamelCase(this.tableName)][method]({ id, params }).then(res => {
+    return api[toCamelCase(this.tableName)][method]({id, params}).then(res => {
       const data = res.data.data
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
       const altered = this.alterResponse({data, method: 'pull'})
@@ -198,12 +198,14 @@ export default class BaseModel {
     })
   }
   
-  static getQueue () {
+  static getQueue() {
     const databaseLayer = new DatabaseLayer(this.database, this.tableName)
-    return databaseLayer.executeSql(`SELECT * FROM ${this.tableName} WHERE (sycned_at IS NULL OR updated_at > sycned_at OR deleted_at IS NOT NULL);`)
+    return databaseLayer.executeSql(`SELECT *
+                                     FROM ${this.tableName}
+                                     WHERE (sycned_at IS NULL OR updated_at > sycned_at OR deleted_at IS NOT NULL);`)
   }
   
-  static pushAll ({ api, methods = {store: 'store', update: 'update', destroy: 'destroy'} }) {
+  static pushAll({api, methods = {store: 'store', update: 'update', destroy: 'destroy'}}) {
     if (!api) return false
     return this.getQueue()
       .then(res => {
@@ -216,7 +218,11 @@ export default class BaseModel {
           if (instance._isNew()) {
             promise = promise.then(() => instance.push({api, method: methods.store, payload: {body: item}}))
           } else if (instance._isUpdated()) {
-            promise = promise.then(() => instance.push({api, method: methods.update, payload: {id: item.id, body: item}}))
+            promise = promise.then(() => instance.push({
+              api,
+              method: methods.update,
+              payload: {id: item.id, body: item}
+            }))
           } else if (instance._isDestroyed()) {
             promise = promise.then(() => instance.push({api, method: methods.destroy, payload: {id: item.id}}))
           }
@@ -228,7 +234,7 @@ export default class BaseModel {
       })
   }
   
-  push ({ api, method, payload }) {
+  push({api, method, payload}) {
     if (!api || !method || !payload) return false
     let data = null
     const self = Object.getPrototypeOf(this).constructor
@@ -255,7 +261,9 @@ export default class BaseModel {
             self.childrens.forEach(children => {
               let databaseLayer = new DatabaseLayer(children.database, children.tableName)
               promise = promise.then(() => {
-                return databaseLayer.executeSql(`UPDATE ${children.tableName} SET ${toUnderscoreCase(self.name)}_id = ${data.id} WHERE ${toUnderscoreCase(self.name)}_id = ${payload.body.id};`)
+                return databaseLayer.executeSql(`UPDATE ${children.tableName}
+                SET ${toUnderscoreCase(self.name)}_id = ${data.id}
+                WHERE ${toUnderscoreCase(self.name)}_id = ${payload.body.id};`)
               })
             })
             return promise
@@ -275,43 +283,43 @@ export default class BaseModel {
     })
   }
   
-  _isNew () {
+  _isNew() {
     return !this.sycned_at
   }
   
-  _isUpdated () {
+  _isUpdated() {
     return moment(this.updated_at).isAfter(this.sycned_at)
   }
   
-  _isDestroyed () {
+  _isDestroyed() {
     return !!this.deleted_at
   }
   
-  _isNotSynced () {
+  _isNotSynced() {
     return this._isNew() || this._isUpdated() || this._isDestroyed()
   }
   
-  static isNew ({ item }) {
+  static isNew({item}) {
     return !item.sycned_at
   }
   
-  static isUpdated ({ item }) {
+  static isUpdated({item}) {
     return moment(item.updated_at).isAfter(item.sycned_at)
   }
   
-  static isDestroyed ({ item }) {
+  static isDestroyed({item}) {
     return !!item.deleted_at
   }
   
-  static isNotSynced ({ item }) {
-    return this.isNew({ item }) || this.isUpdated({ item }) || this.isDestroyed({ item })
+  static isNotSynced({item}) {
+    return this.isNew({item}) || this.isUpdated({item}) || this.isDestroyed({item})
   }
   
-  static injectOptions ({ data }) {
+  static injectOptions({data}) {
     return {}
   }
   
-  static alterResponse ({ data, method }) {
+  static alterResponse({data, method}) {
     return data
   }
 }

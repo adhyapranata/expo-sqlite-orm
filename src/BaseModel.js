@@ -142,15 +142,16 @@ export default class BaseModel {
     return target.queryRaw({options})
   }
   
-  belongsToMany (target, foreignKey = `${toUnderscoreCase(target.name)}_id`, otherKey = 'id') {
+  belongsToMany (target, foreignKey, otherKey = 'id') {
+    const key = foreignKey || `${toUnderscoreCase(target.name)}_id`
     const options = {
-      where: `${otherKey} = ${this[foreignKey]}`
+      where: `${otherKey} = ${this[key]}`
     }
     
     return target.queryRaw({options})
   }
   
-  hasOne (target, foreignKey = 'id', otherKey = `${toUnderscoreCase(self.name)}_id`) {
+  hasOne (target, foreignKey = 'id', otherKey) {
     return this.hasMany(target, foreignKey, otherKey).then(res => {
       return res[0]
     }).catch(err => {
@@ -158,8 +159,8 @@ export default class BaseModel {
     })
   }
   
-  belongsTo (target, foreignKey = `${toUnderscoreCase(target.name)}_id`, otherKey = 'id') {
-    return target.belongsToMany(target, foreignKey, otherKey).then(res => {
+  belongsTo (target, foreignKey, otherKey = 'id') {
+    return this.belongsToMany(target, foreignKey, otherKey).then(res => {
       return res[0]
     }).catch(err => {
       throw err

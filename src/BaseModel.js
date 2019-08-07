@@ -1,6 +1,8 @@
 import Repository from './Repository'
 import DatabaseLayer from 'expo-sqlite-orm/src/DatabaseLayer'
 import moment from 'moment'
+import toCamelCase from './transforms/ConvertStrToCamelCase'
+import toUnderscoreCase from './transforms/ConvertStrToUnderscoreCase'
 
 const isFunction = p =>
   Object.prototype.toString.call(p) === '[object Function]'
@@ -132,7 +134,7 @@ export default class BaseModel {
   
   hasMany (target, foreignKey = 'id', otherKey) {
     const self = Object.getPrototypeOf(this).constructor
-    const key = otherKey || `${this.toUnderscoreCase(self.name)}_id`
+    const key = otherKey || `${toUnderscoreCase(self.name)}_id`
     const options = {
       where: `${key} = ${this[foreignKey]}`
     }
@@ -140,7 +142,7 @@ export default class BaseModel {
     return target.queryRaw({options})
   }
   
-  belongsToMany (target, foreignKey = `${this.toUnderscoreCase(target.name)}_id`, otherKey = 'id') {
+  belongsToMany (target, foreignKey = `${toUnderscoreCase(target.name)}_id`, otherKey = 'id') {
     const options = {
       where: `${otherKey} = ${this[foreignKey]}`
     }
@@ -148,7 +150,7 @@ export default class BaseModel {
     return target.queryRaw({options})
   }
   
-  hasOne (target, foreignKey = 'id', otherKey = `${this.toUnderscoreCase(self.name)}_id`) {
+  hasOne (target, foreignKey = 'id', otherKey = `${toUnderscoreCase(self.name)}_id`) {
     return this.hasMany(target, foreignKey, otherKey).then(res => {
       return res[0]
     }).catch(err => {
@@ -156,7 +158,7 @@ export default class BaseModel {
     })
   }
   
-  belongsTo (target, foreignKey = `${this.toUnderscoreCase(target.name)}_id`, otherKey = 'id') {
+  belongsTo (target, foreignKey = `${toUnderscoreCase(target.name)}_id`, otherKey = 'id') {
     return target.belongsToMany(target, foreignKey, otherKey).then(res => {
       return res[0]
     }).catch(err => {
@@ -166,7 +168,7 @@ export default class BaseModel {
   
   static pullAll ({ api, method = 'getAll', params = {}, queryOptions = {page: 1, limit: 15, order: 'id'} }) {
     if (!api) return false
-    return api[this.toCamelCase(this.tableName)][method]({ params }).then(res => {
+    return api[toCamelCase(this.tableName)][method]({ params }).then(res => {
       const data = res.data.data.map(item => {
         item['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
         return item
@@ -183,7 +185,7 @@ export default class BaseModel {
   
   static pull ({ api, method = 'get', id, params = {} }) {
     if (!api || !id) return false
-    return api[this.toCamelCase(this.tableName)][method]({ id, params }).then(res => {
+    return api[toCamelCase(this.tableName)][method]({ id, params }).then(res => {
       const data = res.data.data
       data['sycned_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
       const altered = this.alterResponse({data, method: 'pull'})
@@ -232,7 +234,7 @@ export default class BaseModel {
     
     payload.options = self.injectOptions({data: this})
     
-    return api[this.toCamelCase(self.tableName)][method](payload).then(res => {
+    return api[toCamelCase(self.tableName)][method](payload).then(res => {
       data = res.data.data
       
       if (method === 'destroy') {
@@ -252,7 +254,7 @@ export default class BaseModel {
             self.childrens.forEach(children => {
               let databaseLayer = new DatabaseLayer(children.database, children.tableName)
               promise = promise.then(() => {
-                return databaseLayer.executeSql(`UPDATE ${children.tableName} SET ${this.toUnderscoreCase(self.name)}_id = ${data.id} WHERE ${this.toUnderscoreCase(self.name)}_id = ${payload.body.id};`)
+                return databaseLayer.executeSql(`UPDATE ${children.tableName} SET ${toUnderscoreCase(self.name)}_id = ${data.id} WHERE ${toUnderscoreCase(self.name)}_id = ${payload.body.id};`)
               })
             })
             return promise
@@ -310,22 +312,5 @@ export default class BaseModel {
   
   static alterResponse ({ data, method }) {
     return data
-  }
-  
-  static toTitleCase(str) {
-    return str.replace(
-      /\w\S*/g,
-      function (txt) {
-        return txt.charAt(0).toUpperCase() + txt.substr(1).toLowerCase()
-      }
-    )
-  }
-  
-  static toCamelCase(str, divider = '_') {
-    return str.split(divider).map((v, k) => (k !== 0) ? this.toTitleCase(v) : v ).join('')
-  }
-  
-  static toUnderscoreCase(str) {
-    return str.replace(/\.?([A-Z])/g, function (x,y){return "_" + y.toLowerCase()}).replace(/^_/, "")
   }
 }

@@ -102,6 +102,10 @@ export default class BaseModel {
     return this.repository.destroyAll()
   }
   
+  static all() {
+    return this.queryRaw()
+  }
+  
   static find(id) {
     return this.repository.find(id).then(res => (res ? new this(res) : res))
   }
@@ -121,11 +125,12 @@ export default class BaseModel {
   
   static queryRaw({options = {}, tableName}) {
     let whereStatement = options.where ? `WHERE (${options.where})` : ''
+    let groupStatement = options.group ? `GROUP BY ${options.group}` : ''
     let sortStatement = options.order ? `ORDER BY ${options.order}` : ''
     let limitStatement = (options.limit && options.page) ? `LIMIT ${options.limit} OFFSET ${options.limit * (options.page - 1)}` : ''
     const table = tableName || this.tableName
     
-    const query = `SELECT ${options.select || '*'} FROM ${table} ${whereStatement} ${sortStatement} ${limitStatement};`
+    const query = `SELECT ${options.select || '*'} FROM ${table} ${whereStatement} ${groupStatement} ${sortStatement} ${limitStatement};`
     const databaseLayer = new DatabaseLayer(this.database, this.tableName)
     return databaseLayer.executeSql(query).then(res => {
       return res.rows.length ? res.rows : []

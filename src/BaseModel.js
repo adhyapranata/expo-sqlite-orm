@@ -27,6 +27,20 @@ export default class BaseModel {
     return this
   }
   
+  static normalizeProps(props) {
+    const obj = {}
+    const cm = this.columnMapping
+    Object.keys(cm).forEach(k => {
+      if (props[k] !== undefined) {
+        obj[k] = props[k]
+      } else {
+        obj[k] = null
+      }
+    })
+    
+    return obj
+  }
+  
   get(target, prop) {
     return this[prop] || typeof this[prop] === 'function' ? this[prop] : ''
   }

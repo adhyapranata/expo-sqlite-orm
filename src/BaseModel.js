@@ -367,7 +367,24 @@ export default class BaseModel {
     return {}
   }
 
-  static alterResponse({data, method}) {
-    return data
+  static alterResponse ({ data, method }) {
+    let result = null
+
+    if (data instanceof Array) {
+      result = data.map(row => this.normalizeProperties(row))
+    } else {
+      result = this.normalizeProperties(data)
+    }
+
+    return result
+  }
+
+  static normalizeProperties (data) {
+    const result = {}
+    Object.keys(this.columnMapping).forEach(key => {
+      result[key] = data[key]
+    })
+
+    return result
   }
 }

@@ -5,7 +5,7 @@ import toCamelCase from './transforms/ConvertStrToCamelCase'
 import toUnderscoreCase from './transforms/ConvertStrToUnderscoreCase'
 
 const isFunction = p =>
-  Object.prototype.toString.call(p) === '[object Function]'
+    Object.prototype.toString.call(p) === '[object Function]'
 
 export default class BaseModel {
   constructor(obj = {}) {
@@ -88,12 +88,12 @@ export default class BaseModel {
   save() {
     if (this.id) {
       return this.constructor.repository
-        .update(this)
-        .then(res => this.setProperties(res))
+          .update(this)
+          .then(res => this.setProperties(res))
     } else {
       return this.constructor.repository
-        .insert(this)
-        .then(res => this.setProperties(res))
+          .insert(this)
+          .then(res => this.setProperties(res))
     }
   }
 
@@ -122,23 +122,23 @@ export default class BaseModel {
 
   static count({ column = 'id', where }) {
     return this.queryRaw({options: {
-      select: `COUNT(${column})`,
-      where
-    }})
+        select: `COUNT(${column})`,
+        where
+      }})
   }
 
   static avg({ column, where }) {
     return this.queryRaw({options: {
-      select: `AVG(${column})`,
-      where
-    }})
+        select: `AVG(${column})`,
+        where
+      }})
   }
 
   static sum({ column, where }) {
     return this.queryRaw({options: {
-      select: `SUM(${column})`,
-      where
-    }})
+        select: `SUM(${column})`,
+        where
+      }})
   }
 
   static find(id) {
@@ -147,8 +147,8 @@ export default class BaseModel {
 
   static findBy(where) {
     return this.repository
-      .findBy(where)
-      .then(res => (res ? new this(res) : res))
+        .findBy(where)
+        .then(res => (res ? new this(res) : res))
   }
 
   /**
@@ -256,30 +256,30 @@ export default class BaseModel {
   static pushAll({api, methods = {store: 'store', update: 'update', destroy: 'destroy'}}) {
     if (!api) return false
     return this.getQueue()
-      .then(res => {
-        let instance = null
-        let promise = Promise.resolve(null)
-        if (!res.rows.length) return promise
+        .then(res => {
+          let instance = null
+          let promise = Promise.resolve(null)
+          if (!res.rows.length) return promise
 
-        for (let item of res.rows) {
-          instance = new this(item)
-          if (instance._isNew()) {
-            promise = promise.then(() => instance.push({api, method: methods.store, payload: {body: item}}))
-          } else if (instance._isUpdated()) {
-            promise = promise.then(() => instance.push({
-              api,
-              method: methods.update,
-              payload: {id: item.id, body: item}
-            }))
-          } else if (instance._isDestroyed()) {
-            promise = promise.then(() => instance.push({api, method: methods.destroy, payload: {id: item.id}}))
+          for (let item of res.rows) {
+            instance = new this(item)
+            if (instance._isNew()) {
+              promise = promise.then(() => instance.push({api, method: methods.store, payload: {body: item}}))
+            } else if (instance._isUpdated()) {
+              promise = promise.then(() => instance.push({
+                api,
+                method: methods.update,
+                payload: {id: item.id, body: item}
+              }))
+            } else if (instance._isDestroyed()) {
+              promise = promise.then(() => instance.push({api, method: methods.destroy, payload: {id: item.id}}))
+            }
           }
-        }
 
-        return promise
-      }).catch(err => {
-        throw err
-      })
+          return promise
+        }).catch(err => {
+          throw err
+        })
   }
 
   push({api, method, payload}) {
@@ -299,24 +299,29 @@ export default class BaseModel {
       data['synced_at'] = moment().format('YYYY-MM-DD HH:mm:ss')
       data = self.alterResponse({data, method: 'push'})
 
+
       const databaseLayer = new DatabaseLayer(self.database, self.tableName)
       return databaseLayer.bulkInsertOrReplace([data]).then(res => {
         if (method === 'store') {
           // destroy old data
-          return self.destroy(payload.body.id).then(res => {
-            // update children foreign key
+          return self.find(payload.body.id).then(res => {
             let promise = Promise.resolve(null)
-            self.childrens.forEach(children => {
-              let databaseLayer = new DatabaseLayer(children.database, children.tableName)
-              promise = promise.then(() => {
-                return databaseLayer.executeSql(`UPDATE ${children.tableName}
+            if (!res) return promise
+
+            return self.destroy(payload.body.id).then(res => {
+              // update children foreign key
+              self.childrens.forEach(children => {
+                let databaseLayer = new DatabaseLayer(children.database, children.tableName)
+                promise = promise.then(() => {
+                  return databaseLayer.executeSql(`UPDATE ${children.tableName}
                 SET ${toUnderscoreCase(self.name)}_id = ${data.id}
                 WHERE ${toUnderscoreCase(self.name)}_id = ${payload.body.id};`)
+                })
               })
+              return promise
+            }).catch(err => {
+              throw err
             })
-            return promise
-          }).catch(err => {
-            throw err
           })
         }
 

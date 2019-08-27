@@ -27,22 +27,8 @@ export default class BaseModel {
     return this
   }
 
-  static normalizeProps(props) {
-    const obj = {}
-    const cm = this.columnMapping
-    Object.keys(cm).forEach(k => {
-      if (props[k] !== undefined) {
-        obj[k] = props[k]
-      } else {
-        obj[k] = null
-      }
-    })
-
-    return obj
-  }
-
   get(target, prop) {
-    return this[prop] || typeof this[prop] === 'function' ? this[prop] : ''
+    return this[prop] || typeof this[prop] === 'function' ? this[prop] : null
   }
 
   static get database() {
@@ -120,21 +106,21 @@ export default class BaseModel {
     return this.queryRaw()
   }
 
-  static count({ column = 'id', where }) {
+  static count({ column = 'id', where = '' }) {
     return this.queryRaw({options: {
         select: `COUNT(${column})`,
         where
       }})
   }
 
-  static avg({ column, where }) {
+  static avg({ column, where = '' }) {
     return this.queryRaw({options: {
         select: `AVG(${column})`,
         where
       }})
   }
 
-  static sum({ column, where }) {
+  static sum({ column, where = '' }) {
     return this.queryRaw({options: {
         select: `SUM(${column})`,
         where

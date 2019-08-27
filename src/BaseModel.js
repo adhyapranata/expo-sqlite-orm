@@ -182,7 +182,7 @@ export default class BaseModel {
 
   hasMany(target, foreignKey = 'id', otherKey) {
     const self = Object.getPrototypeOf(this).constructor
-    const key = otherKey || `${toUnderscoreCase(self.name)}_id`
+    const key = otherKey || `${toUnderscoreCase(self.modelKey)}_id`
     const options = {
       where: `${key} = ${this[foreignKey]}`
     }
@@ -314,8 +314,8 @@ export default class BaseModel {
                 let databaseLayer = new DatabaseLayer(children.database, children.tableName)
                 promise = promise.then(() => {
                   return databaseLayer.executeSql(`UPDATE ${children.tableName}
-                SET ${toUnderscoreCase(self.name)}_id = ${data.id}
-                WHERE ${toUnderscoreCase(self.name)}_id = ${payload.body.id};`)
+                SET ${toUnderscoreCase(self.modelKey)}_id = ${data.id}
+                WHERE ${toUnderscoreCase(self.modelKey)}_id = ${payload.body.id};`)
                 })
               })
               return promise
